@@ -1,0 +1,36 @@
+# Usamos la imagen base de Ubuntu para montar el servidor
+FROM ubuntu:20.04
+
+# Actualizamos la lista de paquetes e instalamos apache2, nano y openssl
+RUN apt update && \
+    apt install -y apache2 openssl nano && \
+    apt clean
+
+# Creamos el directorio para el sitios web y la carpeta privada
+RUN mkdir -p /var/www/html/xlasa-birt/privado
+
+# Copiamos los archivos HTML al contenedor
+COPY ./default.html /var/www/html/index.html
+COPY ./user.html /var/www/html/xlasa-birt/index.html
+COPY ./private.html /var/www/html/xlasa-birt/privado/index.html
+
+# Creamos el usuario deaw para el acceso
+RUN htpasswd -cb /etc/apache2/.htpasswd deaw deaw
+
+# Copiamos el archivo de configuración de apache
+COPY ./apache-config.conf /etc/apache2/sites-available/000-default.conf
+
+# Habilitamos los módulos de reescritura y SSL
+RUN a2enmod rewrite && a2enmod ssl
+
+# Creamos el certificado y lo autofirmamos
+RUN openssl req -new -nodes -keyout xlasa-birt.key -out xlasa-birt.csr \
+    -subj "/C=ES/ST=Barque/L=Berango/O=Birt/CN=Xabier Lasa"
+RUN openssl req -x509 -in xlasa-birt.csr \
+    -out xlasabirt.crt -req -signkey xlasa-birt.key -days 365 
+
+# Exponemos el puerto 80 y el 443
+EXPOSE 80 443
+
+# Comando por defecto al iniciar el contenedor
+CMD ["apache2-foreground"]
